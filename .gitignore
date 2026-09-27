@@ -1,0 +1,48 @@
+# ---- Vivado / SDK build products ----
+*.jou
+*.log
+*.str
+*.dmp
+*.pyc
+*.mif
+
+# Vivado project artifacts
+*.runs/
+*.cache/
+*.hw/
+*.sim/
+*.ip_user_files/
+*.gen/
+.project
+.xpr
+.Xil/
+NA/
+*.bit
+*.ltx
+*.hdf
+*.xsa
+
+# SDK artifacts
+*.elf
+*.o
+*.d
+*.map
+*.bmm
+*_bsp/
+Debug/
+Release/
+.sdk/
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# editors
+.vscode/
+.idea/
+*.swp
+
+# local notes (keep the repo clean)
+notes/
+_scratch/
