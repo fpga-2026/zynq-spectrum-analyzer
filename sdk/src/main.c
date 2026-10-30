@@ -647,60 +647,108 @@ static u32 local_peak(volatile u32 *buf, u32 centre, u32 win, u32 *amp)
  * of the whole analog path.  Everything happens inside the PL/PS - no external
  * source, no extra pin.  At the end the DA is returned to the stock 125 kHz
  * calibrator so a later stream run sees the familiar spectrum. */
+/* 20*log10(num/den) in 0.1 dB steps (attenuation is negative).
+ * Same successive-multiply trick as dbc1(), but the step is 10^(1/200)=1.011579,
+ * so one multiply equals 0.1 dB. Ten times finer than dbc1(), for the sweep curve. */
+static int db_x10(u32 num, u32 den)
+{
+    u64 v;
+    int n = 0;
+
+    if (!num || !den) return 0;
+
+    v = ((u64)num << 30) / (u64)den;            /* normalise to Q30 */
+    while (v < (1ULL << 30) && n < 8000) {      /* num < den: multiply up */
+        v = (v * 1060719ULL) >> 20;             /* x 1.011579 */
+        n++;
+    }
+    while (v > (1ULL << 30) && n > -8000) {     /* num > den: divide down */
+        v = (v << 20) / 1060719ULL;
+        n--;
+    }
+    return -n;
+}
+
 static void run_sweep(void)
 {
     volatile u32 *buf = (volatile u32 *)DDR_RX_BASE;
     fmet_t m;
     u32 i, k, f, exp_bin, bin, amp, amp_ref = 0;
-    int rel_db, rel_min = 999, rel_max = -999;
+    u32 amp_lo, amp_hi;
+    int rel_db, rel_x10, rel_min = 9990, rel_max = -9990;
     int st;
+    const u32 NAVG = 5;                /* frames averaged per frequency point */
 
-    g_park_da = 0;                     /* the sweep drives ctrl itself */
+    g_park_da = 0;                     /* this function owns the DA ctrl word */
     xil_printf("\r\n=== DA SWEEP (RUN_MODE 4) ===\r\n");
     xil_printf("blue SMA loopback DA->AD must be connected\r\n");
 
     st = XGpio_Initialize(&GpioDa, DA_GPIO_ID);
     if (st != XST_SUCCESS) { xil_printf("SWEEP FAIL gpio %d\r\n", st); return; }
     XGpio_SetDataDirection(&GpioDa, 1, 0x00000000);
-    XGpio_DiscreteWrite(&GpioDa, 1, 0x00000000U);      /* calibrator path */
+    XGpio_DiscreteWrite(&GpioDa, 1, 0x00000000U);      /* back to the calibrator */
 
-    /* settle on the stock path first, so a broken sweep cannot hide a bad link */
+    /* check the loopback with the known 125 kHz tone before sweeping */
     for (k = 0; k < SKIP_FRAMES + 2U; k++) (void)capture_one_frame();
     analyze_frame(buf, &m, 0);
     xil_printf("SWEEP_REF125K bin=%d amp=%d dc=%d (expect bin 32, amp ~6000)\r\n",
                (int)m.peak_idx, (int)m.peak_mag, (int)m.dc_mag);
 
-    xil_printf("SWEEP_BEGIN f_start=500000 f_step=500000 n=24\r\n");
+    xil_printf("SWEEP_BEGIN f_start=500000 f_step=500000 n=24 navg=%d\r\n", (int)NAVG);
+
     for (i = 0; i < 24U; i++) {
+        u32 amp_sum = 0, n = 0;
         int comp_q8;
 
         f = 500000U + i * 500000U;
         XGpio_DiscreteWrite(&GpioDa, 1, DA_SWEEP_EN | DA_PINC(f));
         usleep(3000);
-        for (k = 0; k < 5U; k++) (void)capture_one_frame();   /* flush pipeline */
 
-        analyze_frame(buf, &m, 0);
+        /* drop two frames: the FIFO may still hold data from the old tone */
+        for (k = 0; k < 2U; k++) (void)capture_one_frame();
+
         exp_bin = (u32)(((u64)f * (u64)FFT_POINTS) / (u64)FS_AD);
-        bin = local_peak(buf, exp_bin, 32U, &amp);
+        bin     = exp_bin;
+        amp_lo  = 0xFFFFFFFFU;
+        amp_hi  = 0U;
+
+        /* take NAVG frames, find the local peak in each, average */
+        for (k = 0; k < NAVG; k++) {
+            if (capture_one_frame() != 0) continue;
+            analyze_frame(buf, &m, 0);
+            bin = local_peak(buf, exp_bin, 32U, &amp);
+            amp_sum += amp;
+            n++;
+            if (amp < amp_lo) amp_lo = amp;
+            if (amp > amp_hi) amp_hi = amp;
+        }
+        if (n == 0U) { xil_printf("SWEEP FAIL capture f=%d\r\n", (int)f); continue; }
+        amp = amp_sum / n;
 
         if (i == 0U) amp_ref = amp ? amp : 1U;
-        rel_db = (int)(-dbc1(amp ? amp : 1U, amp_ref ? amp_ref : 1U));
-        if (rel_db < rel_min) rel_min = rel_db;
-        if (rel_db > rel_max) rel_max = rel_db;
-        /* display compensation: multiply the displayed magnitude by comp_q8/256 */
+
+        /* rel_db: integer dB (kept for old logs); rel_x10: 0.1 dB, loss positive */
+        rel_db  = (int)(-dbc1 (amp ? amp : 1U, amp_ref ? amp_ref : 1U));
+        rel_x10 = (int)(-db_x10(amp ? amp : 1U, amp_ref ? amp_ref : 1U));
+        if (rel_x10 < rel_min) rel_min = rel_x10;
+        if (rel_x10 > rel_max) rel_max = rel_x10;
+
+        /* display gain: multiply the shown magnitude by comp_q8/256 */
         comp_q8 = (int)((amp > 0U) ? ((u64)amp_ref * 256ULL / (u64)amp) : 256);
         if (comp_q8 > 4096) comp_q8 = 4096;
 
-        xil_printf("SWEEP f_hz=%d exp_bin=%d bin=%d amp=%d rel_db=%d comp_q8=%d dc=%d\r\n",
-                   (int)f, (int)exp_bin, (int)bin, (int)amp, rel_db, comp_q8,
-                   (int)m.dc_mag);
+        xil_printf("SWEEP f_hz=%d exp_bin=%d bin=%d amp=%d amp_lo=%d amp_hi=%d "
+                   "rel_db=%d rel_x10=%d comp_q8=%d dc=%d\r\n",
+                   (int)f, (int)exp_bin, (int)bin, (int)amp, (int)amp_lo, (int)amp_hi,
+                   rel_db, rel_x10, comp_q8, (int)m.dc_mag);
     }
-    xil_printf("SWEEP_DONE n=24 ampref=%d rel_min=%d rel_max=%d flatness_db=%d\r\n",
-               (int)amp_ref, rel_min, rel_max, rel_max - rel_min);
-    xil_printf("SWEEP note: use rel_db for the response curve and comp_q8 for the\r\n");
-    xil_printf("SWEEP note: display compensation (multiply the displayed magnitude).\r\n");
 
-    /* back to the stock 125 kHz calibrator */
+    xil_printf("SWEEP_DONE n=24 navg=%d ampref=%d rel_min_x10=%d rel_max_x10=%d flat_x10=%d\r\n",
+               (int)NAVG, (int)amp_ref, rel_min, rel_max, rel_max - rel_min);
+    xil_printf("SWEEP note: rel_x10 is 0.1 dB units (loss positive), "
+               "comp_q8/256 is the display gain\r\n");
+
+    /* restore the calibrator */
     XGpio_DiscreteWrite(&GpioDa, 1, 0x00000000U);
     g_park_da = 1;
     usleep(2000);
