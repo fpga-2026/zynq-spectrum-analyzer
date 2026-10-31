@@ -107,6 +107,41 @@ def decode(pkt, n_bins):
                 n_peaks=n_peaks, cls=cls, mags=mags)
 
 
+_REC = None          # --record 打开的文件句柄（收到什么就写什么）
+
+
+class FileSource:
+    """--replay 用：接口和 serial.Serial 一样（read / in_waiting / write / close），
+    但数据来自一个录好的原始字节文件，读到末尾自动从头再来。"""
+
+    def __init__(self, path, chunk=4096):
+        self.f = io.open(path, "rb") if False else open(path, "rb")
+        self.chunk = chunk
+        self.eof = False
+
+    @property
+    def in_waiting(self):
+        return self.chunk
+
+    def read(self, n=1):
+        data = self.f.read(max(1, n))
+        if not data:
+            self.eof = True
+            time.sleep(0.05)
+            self.f.seek(0)          # 循环回放，方便反复看同一段数据
+            return b""
+        return data
+
+    def write(self, b):
+        return len(b)               # 回放模式下发不了通道切换命令，直接忽略
+
+    def flush(self):
+        pass
+
+    def close(self):
+        self.f.close()
+
+
 def headless(ser, parser, n_bins, fs, duration, raw_dump=0):
     t0 = time.time()
     n_pkt = 0
@@ -122,6 +157,8 @@ def headless(ser, parser, n_bins, fs, duration, raw_dump=0):
         if not data:
             continue
         n_bytes += len(data)
+        if _REC is not None:
+            _REC.write(data)
         if len(raw) < 8192:
             raw += data[: 8192 - len(raw)]
 
@@ -218,6 +255,8 @@ def gui(ser, parser, n_bins, fs, hold):
     def update():
         data = ser.read(max(1, ser.in_waiting))
         if data:
+            if _REC is not None:
+                _REC.write(data)
             for pkt in parser.feed(data):
                 p = decode(pkt, n_bins)
                 m = p["mags"].astype(np.float64)
@@ -346,6 +385,8 @@ def main():
     ap.add_argument("--selftest", action="store_true", help="offline protocol self-test")
     ap.add_argument("--raw", type=int, default=0, help="hex-dump this many bytes if no packet")
     ap.add_argument("--switch", default="", help="send a channel command and exit: d or a")
+    ap.add_argument("--record", default="", help="save every received byte to this file")
+    ap.add_argument("--replay", default="", help="replay a recorded file instead of the serial port")
     args = ap.parse_args()
 
     if args.selftest:
@@ -354,9 +395,18 @@ def main():
 
     if args.dds:
         args.fs = 100e6
-    check_deps(not args.headless, need_serial=True)
+    check_deps(not args.headless, need_serial=not args.replay)
 
-    ser = serial.Serial(args.port, args.baud, timeout=0.05)
+    global _REC
+    if args.record:
+        _REC = open(args.record, "wb")
+        print(f"recording raw bytes to {args.record}")
+
+    if args.replay:
+        ser = FileSource(args.replay)
+        print(f"replaying {args.replay} (no serial port opened)")
+    else:
+        ser = serial.Serial(args.port, args.baud, timeout=0.05)
 
     if args.switch:
         cmd = b"D" if args.switch.strip().lower().startswith("d") else b"A"
@@ -369,7 +419,10 @@ def main():
         return 0
 
     parser = PacketParser(args.bins)
-    print(f"opened {args.port} @ {args.baud}, n_bins={args.bins}, "
+    if args.replay:
+        print(f"replay mode, n_bins={args.bins}, fs={args.fs/1e6:.1f} MHz")
+    else:
+        print(f"opened {args.port} @ {args.baud}, n_bins={args.bins}, "
           f"fs={args.fs/1e6:.1f} MHz, bin={args.fs/8192/1e3:.4f} kHz")
 
     try:
