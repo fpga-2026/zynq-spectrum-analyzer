@@ -243,10 +243,16 @@ def gui(ser, parser, n_bins, fs, hold):
     else:
         curve_h = None
 
-    label = pg.TextItem("waiting for the first packet ...", color=(230, 230, 230))
-    label.setPos(0.01, 0.98)
-    label.setParentItem(plot.getViewBox())
-    label.setAnchor((0, 1))
+    # 指标叠加层：用 QLabel 贴在窗口左上角（TextItem 是数据坐标，会被画到图外）
+    label = QtWidgets.QLabel(win)
+    label.setStyleSheet(
+        "QLabel { color: #EDEDED; background-color: rgba(0, 0, 0, 165);"
+        " font-family: Consolas, 'Courier New', monospace; font-size: 12px;"
+        " padding: 7px 9px; border-radius: 5px; }")
+    label.setText("waiting for the first packet ...")
+    label.move(10, 8)
+    label.adjustSize()
+    label.show()
 
     state = {"t0": time.time(), "n": 0, "fps": 0.0, "last": time.time(),
              "peak": np.zeros(n_bins, dtype=np.float64), "shown": 0,
@@ -294,7 +300,8 @@ def gui(ser, parser, n_bins, fs, hold):
                 f"floor={p['floor_mag']}  peaks={p['n_peaks']}  "
                 f"class={CLS_NAMES.get(p['cls'], '?')}\n"
                 f"checksum errors={parser.cs_err}  resyncs={parser.resync}   "
-                f"[press 'a' AD / 'd' DDS to switch channel]")
+                f"[a=AD  d=DDS  c=clear hold  h=help]")
+            label.adjustSize()
 
     # live channel switching: the firmware polls the same UART for 'A'/'D'
     from pyqtgraph.Qt import QtGui

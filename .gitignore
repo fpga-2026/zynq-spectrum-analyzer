@@ -46,3 +46,6 @@ Desktop.ini
 # local notes (keep the repo clean)
 notes/
 _scratch/
+# 本机同步脚本（含绝对路径，不入库）
+sync_sources.ps1
+
