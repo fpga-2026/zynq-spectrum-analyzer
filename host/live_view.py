@@ -1,21 +1,9 @@
 #!/usr/bin/env python3
-# -----------------------------------------------------------------------------
-# live_view.py -- real-time viewer for the stage-3 binary stream
-#
-# Protocol (little endian, 36 + 2*NBINS + 2 bytes):
-#   0  2  sync 0x55 0xAA     2  seq      4  n_bins    6  flags
-#   8  2  peak_idx          10  ped      12 skirt    14 far      (i16 dBc)
-#  16  4  peak_mag          20  dc_mag   24 hw_peak_mag_sq
-#  28  2  hw_peak_idx       30  cap_us   32 t_us
-#  36  2*NBINS  magnitudes (u16)
-#   +=2  checksum = sum of the preceding bytes, low 16 bits
-#
-# flags: bit0 quality pass, bit1 peak valid, bit2 xcheck ok, bit3 channel (1=DDS)
-#
-#   python live_view.py --port COM6                 # GUI, 230400, AD path
-#   python live_view.py --port COM6 --headless      # text only (link test)
-#   python live_view.py --port COM6 --dds           # DDS path (Fs = 100 MHz)
-# -----------------------------------------------------------------------------
+# live_view.py -- 频谱上位机：串口收 2102 字节一包，实时画频谱并打印指标
+#   python live_view.py --port COM6            有界面
+#   python live_view.py --port COM6 --headless 只看文本
+#   python live_view.py --replay x.bin         回放录好的数据
+# 协议字段见 host/给队友_通信协议.md
 import argparse
 import struct
 import sys

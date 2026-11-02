@@ -1,50 +1,13 @@
 /*
- * ad_snapshot_stage3_main.c  --  stage 3: binary streaming + two-level calibration
+ * sdk_stage3_main.c -- spectrum analyser, PS side
  *
- * Everything here is PS software: the PL (BD, FFT, DMA, mux, DDS, AD) is
- * untouched, so the already-verified DDS / FFT / DMA / MUX links cannot break.
- * The AXI DMA already delivers the complete 8192-point complex FFT frame to DDR,
- * so the PS has everything needed for display, calibration and cross-checking.
+ *   RUN_MODE 1 : binary stream for the host viewer
+ *   RUN_MODE 0 : self-calibration (CAL_L1 / CAL_L2 / CAL_XCHK)
+ *   RUN_MODE 4 : DA sweep, measures the loop amplitude response
  *
- * RUN_MODE = 1 : binary stream  (for the live host viewer)
- * RUN_MODE = 0 : calibration report (two-level self-calibration + cross-check)
- *
- * Binary packet (little endian, 36 + 2*NBINS + 2 bytes):
- *   0  2  sync 0x55 0xAA
- *   2  2  seq
- *   4  2  n_bins            = NBINS
- *   6  2  flags             bit0 quality_pass, bit1 peak_valid,
- *                           bit2 xcheck_ok, bit3 channel (1 = DDS, 0 = AD)
- *   8  2  peak_idx
- *  10  2  ped_dbc   (i16)
- *  12  2  skirt_dbc (i16)
- *  14  2  far_dbc   (i16)
- *  16  4  peak_mag        (PS |X| at peak_idx)
- *  20  4  dc_mag          (PS |X[0]|)
- *  24  4  hw_peak_mag_sq  (PL peak detector)
- *  28  2  hw_peak_idx
- *  30  2  cap_us
- *  32  4  t_us
- *  36  2*N magnitudes (u16, bins 0..NBINS-1)
- *  36+2*N  2  checksum = sum of the preceding bytes, low 16 bits
- *
- * UART: 230400 baud.  The PS UART reference clock is 100 MHz (verified in the
- * BSP: XPAR_XUARTPS_0_UART_CLK_FREQ_HZ = 100000000), so 230400 divides by 27 to
- * 231481 Bd (+0.47% - safe).  460800 would divide by 14 -> 446429 Bd (-3.12%,
- * marginal), which is why 230400 was chosen.  At 230400 a 2086-byte packet
- * gives about 11 frames/s.
- *
- * Calibration (RUN_MODE = 0):
- *   L1  DDS reference  -> backend bin mapping / amplitude / leakage baseline
- *   L2  DA -> AD       -> front-end offset and amplitude in ADC LSB
- *   XCHK              -> PL peak detector vs PS peak, per frame
- *
- * Scaling note (measured on this board): with the scaled 8192-point FFT the
- * output satisfies |X[k]| = A/2 for a full-scale sine of amplitude A, and
- * |X[0]| = (DC level).  The AD path applies x512 digital gain, so
- *     ADC residual offset [LSB] = dc_mag / 512
- *     ADC tone amplitude [LSB]  = peak_mag * 2 / 512 = peak_mag / 256
- * which reproduces the analog measurements (0.45 LSB offset, 23.2 LSB tone).
+ * packet: 52 B header + 1024 x u16 magnitudes + 2 B checksum  (see send_packet)
+ * uart  : 230400 8N1, UART refclk 100 MHz / 27 = 231481 Bd (+0.47%)
+ * scale : amp_LSB = peak_mag / 256,  offset_LSB = dc_mag / 512
  */
 
 #include <stdio.h>
