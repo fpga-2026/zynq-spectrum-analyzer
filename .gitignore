@@ -49,3 +49,8 @@ _scratch/
 # 本机同步脚本（含绝对路径，不入库）
 sync_sources.ps1
 
+
+# Python 缓存
+__pycache__/
+*.pyc
+
