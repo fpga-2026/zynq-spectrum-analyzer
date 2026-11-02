@@ -230,15 +230,26 @@ def gui(ser, parser, n_bins, fs, hold):
     plot = win.addPlot(row=0, col=0)
     plot.setLabel("bottom", "frequency", units="Hz")
     plot.setLabel("left", "|X| (FFT magnitude)")
+    # 视频/投影用：把刻度字体放大（失败也不影响主流程）
+    try:
+        from pyqtgraph.Qt import QtGui as _QtGui
+        _big = _QtGui.QFont("Consolas", 14)
+        _big.setStyleHint(_QtGui.QFont.Monospace)
+        plot.getAxis("bottom").setStyle(tickFont=_big, tickTextOffset=10)
+        plot.getAxis("left").setStyle(tickFont=_big)
+        plot.getAxis("bottom").setHeight(46)
+        plot.getAxis("left").setWidth(70)
+    except Exception:
+        pass
     plot.showGrid(x=True, y=True, alpha=0.25)
     plot.setLogMode(x=False, y=False)
 
     bin_hz = fs / 8192.0
     x = np.arange(n_bins) * bin_hz
-    curve = plot.plot(x, np.zeros(n_bins), pen=pg.mkPen("#4fc3f7", width=1))
+    curve = plot.plot(x, np.zeros(n_bins), pen=pg.mkPen("#4fc3f7", width=2))
     if hold:
         curve_h = plot.plot(x, np.zeros(n_bins),
-                            pen=pg.mkPen("#ff8a65", width=1,
+                            pen=pg.mkPen("#ff8a65", width=1.5,
                                          style=QtCore.Qt.DashLine))
     else:
         curve_h = None
@@ -247,8 +258,8 @@ def gui(ser, parser, n_bins, fs, hold):
     label = QtWidgets.QLabel(win)
     label.setStyleSheet(
         "QLabel { color: #EDEDED; background-color: rgba(0, 0, 0, 165);"
-        " font-family: Consolas, 'Courier New', monospace; font-size: 12px;"
-        " padding: 7px 9px; border-radius: 5px; }")
+        " font-family: Consolas, 'Courier New', monospace; font-size: 22px;"
+        " padding: 12px 16px; border-radius: 8px; }")
     label.setText("waiting for the first packet ...")
     label.move(10, 8)
     label.adjustSize()
