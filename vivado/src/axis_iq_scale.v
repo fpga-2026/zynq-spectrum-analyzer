@@ -20,7 +20,7 @@ wire signed [DATA_W-1:0] i_in, q_in;
 
 assign {i_in, q_in} = s_axis_tdata;
 
-// ========= 修改点：固定直通，不再判断scale_en =========
+// ========= 淇敼鐐癸細鍥哄畾鐩撮�氾紝涓嶅啀鍒ゆ柇scale_en =========
 wire signed [DATA_W-1:0] i_out = i_in;
 wire signed [DATA_W-1:0] q_out = q_in;
 // ================================================

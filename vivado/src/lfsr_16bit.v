@@ -3,10 +3,10 @@ module lfsr_16bit (
     input  wire        rst_n,
     output reg signed [15:0] noise_out
 );
-    // 4 ¸ö¶ÀÁ¢µÄ 16-bit LFSR
+    // 4 ä¸ªç‹¬ç«‹çš„ 16-bit LFSR
     reg [15:0] lfsr_0, lfsr_1, lfsr_2, lfsr_3;
     
-    // 4 ¸ö²»Í¬µÄ·´À¡¶àÏîÊ½£¬È·±£ËüÃÇ»¥²»Ïà¹Ø
+    // 4 ä¸ªä¸åŒçš„åé¦ˆå¤šé¡¹å¼ï¼Œç¡®ä¿å®ƒä»¬äº’ä¸ç›¸å…³
     wire fb_0 = lfsr_0[15] ^ lfsr_0[13] ^ lfsr_0[12] ^ lfsr_0[10];
     wire fb_1 = lfsr_1[15] ^ lfsr_1[14] ^ lfsr_1[12] ^ lfsr_1[11];
     wire fb_2 = lfsr_2[15] ^ lfsr_2[14] ^ lfsr_2[13] ^ lfsr_2[11];
@@ -14,7 +14,7 @@ module lfsr_16bit (
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            // ¸ø 4 ¸ö LFSR ²»Í¬µÄ·ÇÁãÖÖ×Ó
+            // ç»™ 4 ä¸ª LFSR ä¸åŒçš„éé›¶ç§å­
             lfsr_0 <= 16'hABCD;
             lfsr_1 <= 16'h1234;
             lfsr_2 <= 16'h5678;
@@ -22,19 +22,19 @@ module lfsr_16bit (
             noise_out <= 16'sd0;
         end
         else begin
-            // 4 ¸ö LFSR Í¬Ê±ÒÆÎ»
+            // 4 ä¸ª LFSR åŒæ—¶ç§»ä½
             lfsr_0 <= {lfsr_0[14:0], fb_0};
             lfsr_1 <= {lfsr_1[14:0], fb_1};
             lfsr_2 <= {lfsr_2[14:0], fb_2};
             lfsr_3 <= {lfsr_3[14:0], fb_3};
             
-            // ¡¾ºËĞÄ¡¿½« 4 ¸ö LFSR µ±×÷ÓĞ·ûºÅÊıÏà¼Ó
-            // 4 ¸ö¾ùÔÈ·Ö²¼Ïà¼Ó = ½üËÆ¸ßË¹·Ö²¼£¡
-            // Ïà¼ÓºóÎ»¿í»á±ä³É 18 bit£¬ÎÒÃÇ½ØÈ¡ÖĞ¼ä 16 bit ×÷ÎªÊä³ö
+            // ã€æ ¸å¿ƒã€‘å°† 4 ä¸ª LFSR å½“ä½œæœ‰ç¬¦å·æ•°ç›¸åŠ 
+            // 4 ä¸ªå‡åŒ€åˆ†å¸ƒç›¸åŠ  = è¿‘ä¼¼é«˜æ–¯åˆ†å¸ƒï¼
+            // ç›¸åŠ åä½å®½ä¼šå˜æˆ 18 bitï¼Œæˆ‘ä»¬æˆªå–ä¸­é—´ 16 bit ä½œä¸ºè¾“å‡º
             noise_out <= ({lfsr_0[15], lfsr_0} + 
                           {lfsr_1[15], lfsr_1} + 
                           {lfsr_2[15], lfsr_2} + 
-                          {lfsr_3[15], lfsr_3}) >>> 3; // ÓÒÒÆ2Î»·ÀÖ¹Òç³ö£¬±£³Ö16-bit·¶Î§
+                          {lfsr_3[15], lfsr_3}) >>> 3; // å³ç§»2ä½é˜²æ­¢æº¢å‡ºï¼Œä¿æŒ16-bitèŒƒå›´
         end
     end
 endmodule

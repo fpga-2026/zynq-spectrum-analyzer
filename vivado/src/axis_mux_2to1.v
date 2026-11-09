@@ -3,19 +3,19 @@ module axis_mux_2to1 #(
 )(
     input  wire                     aclk,
     input  wire                     aresetn,
-    // Ñ¡ÔñÐÅºÅ: 0 -> s00(AD), 1 -> s01(DDS)
+    // é€‰æ‹©ä¿¡å·: 0 -> s00(AD), 1 -> s01(DDS)
     input  wire                     sel,
-    // S00 ÊäÈë£¨ADÍ¨Â·£©
+    // S00 è¾“å…¥ï¼ˆADé€šè·¯ï¼‰
     input  wire [DATA_WIDTH-1:0]    s00_tdata,
     input  wire                     s00_tvalid,
     output wire                     s00_tready,
     input  wire                     s00_tlast,
-    // S01 ÊäÈë£¨DDS+mixerÍ¨Â·£©
+    // S01 è¾“å…¥ï¼ˆDDS+mixeré€šè·¯ï¼‰
     input  wire [DATA_WIDTH-1:0]    s01_tdata,
     input  wire                     s01_tvalid,
     output wire                     s01_tready,
     input  wire                     s01_tlast,
-    // Êä³öµ½FFT
+    // è¾“å‡ºåˆ°FFT
     output reg [DATA_WIDTH-1:0]     m_tdata,
     output reg                      m_tvalid,
     input  wire                     m_tready,

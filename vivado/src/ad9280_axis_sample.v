@@ -1,21 +1,21 @@
 module ad9280_axis_sample(
     input  wire        wr_clk,       // 32MHz full_clk2
     input  wire        wr_rst_n,
-    input  wire        fifo_full,    // À´×ÔÒì²½FIFO fullĞÅºÅ
+    input  wire        fifo_full,    // æ¥è‡ªå¼‚æ­¥FIFO fullä¿¡å·
 
-    // AD9280 Ó²¼ş¶Ë¿Ú
+    // AD9280 ç¡¬ä»¶ç«¯å£
     (* X_INTERFACE_INFO = "xilinx.com:signal:clock:1.0 ad_clk CLK" *)
     (* X_INTERFACE_PARAMETER = "FREQ_HZ 32000000" *)
-    output wire        ad_clk,       // ADÇı¶¯Ê±ÖÓ£¬Êä³öµ½Òı½ÅA3
-    input  wire [7:0]  ad_data,      // AD²¢ĞĞ²ÉÑùÊı¾İ
-    input  wire        ad_otr,       // Á¿³ÌÒç³ö±êÖ¾£¨Ô¤Áô£¬¿ÉILA¹Û²â£©
+    output wire        ad_clk,       // ADé©±åŠ¨æ—¶é’Ÿï¼Œè¾“å‡ºåˆ°å¼•è„šA3
+    input  wire [7:0]  ad_data,      // ADå¹¶è¡Œé‡‡æ ·æ•°æ®
+    input  wire        ad_otr,       // é‡ç¨‹æº¢å‡ºæ ‡å¿—ï¼ˆé¢„ç•™ï¼Œå¯ILAè§‚æµ‹ï¼‰
 
-    // Êä³öµ½Òì²½FIFOĞ´¶Ë¿Ú
+    // è¾“å‡ºåˆ°å¼‚æ­¥FIFOå†™ç«¯å£
     output reg  [7:0]  fifo_din,
     output reg         fifo_wr_en
 );
 
-assign ad_clk = wr_clk; // ADÊ±ÖÓÍ¬²½32M
+assign ad_clk = wr_clk; // ADæ—¶é’ŸåŒæ­¥32M
 
 always @(posedge wr_clk) begin
     if(!wr_rst_n) begin
@@ -24,7 +24,7 @@ always @(posedge wr_clk) begin
     end
     else begin
         fifo_din   <= ad_data;
-        fifo_wr_en <= ~fifo_full; // FIFOÎ´Âú²ÅĞ´Èë£¬·ÀÖ¹Òç³ö¶ªÊı¾İ
+        fifo_wr_en <= ~fifo_full; // FIFOæœªæ»¡æ‰å†™å…¥ï¼Œé˜²æ­¢æº¢å‡ºä¸¢æ•°æ®
     end
 end
 
